@@ -8,14 +8,14 @@ namespace ofxCortex { namespace io { namespace hardware {
 
 class ArtnetController {
 public:
-  ArtnetController(size_t outputCount) {
-    for (int i = 0; i < outputCount; i++)
-    {
-      outputs.insert({ i, std::vector<std::shared_ptr<ArtnetDevice>>() });
-    }
-  }
-  
   ~ArtnetController() { clear(); }
+  
+  template<typename ... T>
+  static std::shared_ptr<ArtnetController> create(T&& ... t) {
+    struct EnableMakeShared : public ArtnetController { EnableMakeShared(T&&... arg) : ArtnetController(std::forward<T>(arg)...) {} };
+    
+    return std::make_shared<EnableMakeShared>(std::forward<T>(t)...);
+  }
   
   inline void connect(const std::string & IP) { isConnected = artnet.setup(IP); }
   
@@ -24,12 +24,21 @@ public:
   template<typename DeviceType>
   inline void addDevicesToOutput(const std::vector<std::shared_ptr<DeviceType>> & devices, unsigned int port) { outputs[port].insert(outputs[port].end(), devices.begin(), devices.end()); }
   
+  void resetOutputs();
+  
   void drawStructure(const ofRectangle & bounds = ofGetCurrentViewport());
   
   void send();
   void clear();
   
 protected:
+  ArtnetController(size_t outputCount) {
+    for (int i = 0; i < outputCount; i++)
+    {
+      outputs.insert({ i, std::vector<std::shared_ptr<ArtnetDevice>>() });
+    }
+  }
+  
   ofxArtnetSender artnet;
   bool isConnected { false };
   std::map<unsigned int, std::vector<std::shared_ptr<ArtnetDevice>>> outputs;

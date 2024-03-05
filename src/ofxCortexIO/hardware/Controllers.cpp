@@ -27,6 +27,11 @@ void ArtnetController::clear()
   this->send();
 }
 
+void ArtnetController::resetOutputs()
+{
+  outputs.clear();
+}
+
 void ArtnetController::drawStructure(const ofRectangle & bounds)
 {
   int structureColumns = 8;

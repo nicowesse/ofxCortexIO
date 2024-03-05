@@ -30,7 +30,7 @@ protected:
 };
 
 struct LED : public ArtnetDevice {
-  ofFloatColor color;
+  ofFloatColor color { 0, 0 };
   uint_fast64_t index;
   
   static std::shared_ptr<LED> create() { return std::make_shared<LED>(); }
@@ -89,15 +89,22 @@ struct NeoPixel : public LED {
     ofPushMatrix();
     {
       ofMultMatrix(getGlobalTransformMatrix());
+      ofRotateXDeg(-90);
       ofScale(1.0);
       
       ofPushStyle();
       {
-        ofSetColor(255);
-        ofDrawCylinder(0, 1, 9, 2);
+        ofSetColor(16);
+        ofFill();
+        ofDrawBox(0, 1, 0, 7, 2, 7);
+        
+        ofSetColor(255, 64);
+        ofNoFill();
+        ofDrawBox(0, 1, 0, 7, 2, 7);
         
         ofSetColor(getDisplayColor());
-        ofDrawSphere(0, 3, 4);
+        ofFill();
+        ofDrawSphere(0, 2, 1.5);
       }
       ofPopStyle();
     }
