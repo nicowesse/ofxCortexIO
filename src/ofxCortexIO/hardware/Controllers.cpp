@@ -4,14 +4,38 @@ namespace ofxCortex { namespace io { namespace hardware {
 
 void ArtnetController::send()
 {
+  unsigned long latency = ofGetElapsedTimeMillis() - lastTransmit;
+  
+//  unsigned output = 3;
+//  unsigned channels = 4;
+//  uint8_t outputAndChannels = (output << 4) | channels;
+  
   std::vector<ofxArtnetMessage> packets;
   for (int i = 0; i < outputs.size(); i++)
   {
     const auto & devices = outputs.at(i);
+    if (devices.size() == 0) continue;
+    
     auto outputPackets = ofxCortex::io::utils::devicesToArtnet(devices, i * 4);
+    for (auto & packet : outputPackets) {
+//      uint channelsAndOutput = ((unsigned) i << 4) | packet.getSubnet();
+      packet.setUniverse(i, packet.getSubnet(), packet.getUniverse()); // Net = Output Port | Subnet = Channels pr device
+    }
     ofxCortex::core::utils::Array::appendVector(packets, outputPackets);
   }
   ofxCortex::io::utils::sendPackets(artnet, packets);
+  
+  if (ofGetLogLevel() == OF_LOG_VERBOSE)
+  {
+    auto metadata = ofxCortex::core::utils::Array::transform<std::string>(packets, [](const ofxArtnetMessage & msg){
+      std::stringstream output; output << "<U:" << msg.getUniverse() << " | OUT:" << msg.getNet() << " | CH:" << msg.getSubnet() << " | B:" << msg.getSize() << ">";
+      return output.str();
+    });
+    
+    ofLogVerbose("ArtnetController::send()") << "Sending " << packets.size() << " packets with data " << ofToString(metadata) << " to '" << artnet.getIP() << "' (latency: " << latency << "ms)";
+  }
+  
+  lastTransmit = ofGetElapsedTimeMillis();
 }
 
 void ArtnetController::clear()

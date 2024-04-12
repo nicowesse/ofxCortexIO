@@ -41,6 +41,7 @@ protected:
   
   ofxArtnetSender artnet;
   bool isConnected { false };
+  unsigned long lastTransmit { 0 };
   std::map<unsigned int, std::vector<std::shared_ptr<ArtnetDevice>>> outputs;
 };
 

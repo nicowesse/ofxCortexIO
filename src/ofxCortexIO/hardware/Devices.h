@@ -17,6 +17,7 @@ public:
   
 protected:
   Device() = default;
+  virtual ~Device() = default;
 };
 
 struct ArtnetDevice : public Device {
@@ -30,10 +31,16 @@ protected:
 };
 
 struct LED : public ArtnetDevice {
+public:
   ofFloatColor color { 0, 0 };
   uint_fast64_t index;
   
-  static std::shared_ptr<LED> create() { return std::make_shared<LED>(); }
+public:
+  template<typename ... T>
+  static std::shared_ptr<LED> create(T&& ... t) {
+    struct EnableMakeShared : public LED { EnableMakeShared(T&&... arg) : LED(std::forward<T>(arg)...) {} };
+    return std::make_shared<EnableMakeShared>(std::forward<T>(t)...);
+  }
   
   static std::string deviceName() { return "LED"; }
   
@@ -77,47 +84,8 @@ struct LED : public ArtnetDevice {
   
   virtual unsigned int getChannelCount() override { return 4; }
   
-};
-
-struct NeoPixel : public LED {
-  static std::shared_ptr<NeoPixel> create() { return std::make_shared<NeoPixel>(); }
-  
-  static std::string deviceName() { return "NeoPixel"; }
-  
-  virtual void draw() override
-  {
-    ofPushMatrix();
-    {
-      ofMultMatrix(getGlobalTransformMatrix());
-      ofRotateXDeg(-90);
-      ofScale(1.0);
-      
-      ofPushStyle();
-      {
-        ofSetColor(16);
-        ofFill();
-        ofDrawBox(0, 1, 0, 7, 2, 7);
-        
-        ofSetColor(255, 64);
-        ofNoFill();
-        ofDrawBox(0, 1, 0, 7, 2, 7);
-        
-        ofSetColor(getDisplayColor());
-        ofFill();
-        ofDrawSphere(0, 2, 1.5);
-      }
-      ofPopStyle();
-    }
-    ofPopMatrix();
-  }
-  
-  virtual std::vector<uint8_t> getData() override
-  {
-    const ofColor & c = getRGBW();
-    return std::vector<uint8_t>({ c.g, c.r, c.b, c.a });
-  }
-  
-  virtual unsigned int getChannelCount() override { return 4; }
+protected:
+  LED(const ofFloatColor & color = ofFloatColor(0, 0), unsigned int index = 0) : color(color), index(index) {};
 };
 
 }}}
