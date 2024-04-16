@@ -13,6 +13,8 @@ public:
   ParameterLinker() {
     ofAddListener(ofEvents().update, this, &ParameterLinker::update);
     ofAddListener(ofEvents().keyPressed, this, &ParameterLinker::keyPressed);
+    
+    midiIn.listInPorts();
   };
   
   ~ParameterLinker() {
@@ -25,23 +27,15 @@ public:
   
   void setup(int port)
   {
-    midiIn.listInPorts();
-    
     midiIn.openPort(port);
     midiIn.ignoreTypes(false, false, false);
     midiIn.addListener(this);
-    midiIn.setVerbose(true);
+    midiIn.setVerbose(false);
   }
   
-  void link(const ofAbstractParameter & parameter)
+  void link(const std::shared_ptr<ofAbstractParameter> & parameterRef)
   {
-    if (!isParameterLinkable(parameter))
-    {
-      ofLogWarning("ParameterLinker") << "Invalid type for parameter '" << parameter.getName() << "'. Only float, int or bool is accepted.";
-      return;
-    }
-    
-    queuedParameters.push_back(parameter.newReference());
+    queuedParameters.push_back(parameterRef);
   }
   
   bool saveLinks(string path = "links.json")
@@ -80,9 +74,11 @@ public:
     }
   }
   
+  void enableMultilink() { multilinkEnabled = true; }
+  void disableMultilink() { multilinkEnabled = false; }
+  
 protected:
   ofxMidiIn midiIn;
-  
   std::deque<ofxMidiMessage> messages;
   
   void newMidiMessage(ofxMidiMessage& msg)
@@ -100,7 +96,7 @@ protected:
       
       if (!linkIsTaken)
       {
-        std::cout << "Link: " << messageHash << " <=> '" << queuedParameters.front()->getName() << "'" << std::endl;
+        ofLogNotice("ParameterLinker") << "Link: " << messageHash << " <=> '" << queuedParameters.front()->getName() << "'" << std::endl;
         links[messageHash] = queuedParameters.front();
         queuedParameters.pop_front();
       }
@@ -108,25 +104,28 @@ protected:
     
     if (links.count(messageHash))
     {
-      const auto & parameter = links[messageHash];
+      const std::shared_ptr<ofAbstractParameter> & parameter = links[messageHash];
       
       if (parameter->valueType() == typeid(float).name())
       {
-        ofParameter<float> & casted = parameter->cast<float>();
+        std::shared_ptr<ofxCortex::UnitParameter<float>> unitP = static_pointer_cast<ofxCortex::UnitParameter<float>>(parameter);
+        ofParameter<float> & casted = (unitP) ? unitP->getParameter() : parameter->cast<float>();
         
-        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax());
+        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax(), true);
       }
       
       if (parameter->valueType() == typeid(int).name())
       {
-        ofParameter<int> & casted = parameter->cast<int>();
+        std::shared_ptr<ofxCortex::UnitParameter<int>> unitP = static_pointer_cast<ofxCortex::UnitParameter<int>>(parameter);
+        ofParameter<int> & casted = (unitP) ? unitP->getParameter() : parameter->cast<int>();
         
-        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax());
+        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax(), true);
       }
       
       if (parameter->valueType() == typeid(bool).name())
       {
-        ofParameter<bool> & casted = parameter->cast<bool>();
+        std::shared_ptr<ofxCortex::UnitParameter<bool>> unitP = static_pointer_cast<ofxCortex::UnitParameter<bool>>(parameter);
+        ofParameter<bool> & casted = (unitP) ? unitP->getParameter() : parameter->cast<bool>();
         
         bool isSlider = msg.value > 0 && msg.value < 127;
         
@@ -140,7 +139,8 @@ protected:
       
       if (parameter->valueType() == typeid(void).name())
       {
-        ofParameter<void> & casted = parameter->cast<void>();
+        std::shared_ptr<ofxCortex::UnitParameter<void>> unitP = static_pointer_cast<ofxCortex::UnitParameter<void>>(parameter);
+        ofParameter<void> & casted = (unitP) ? unitP->getParameter() : parameter->cast<void>();
         
         if (msg.value > 0) casted.trigger();
       }
@@ -162,21 +162,29 @@ protected:
     
     if (shouldLink) {
       auto focusedView = ofxCortex::ui::View::getFocused();
-      auto sliderFloatView = dynamic_pointer_cast<ofxCortex::ui::Slider<float>>(focusedView);
-      auto sliderIntView = dynamic_pointer_cast<ofxCortex::ui::Slider<int>>(focusedView);
-      auto checkboxView = dynamic_pointer_cast<ofxCortex::ui::Checkbox>(focusedView);
-      auto buttonView = dynamic_pointer_cast<ofxCortex::ui::Button>(focusedView);
+      auto parameterView = dynamic_pointer_cast<ofxCortex::ui::ParameterView>(focusedView);
       
-      if (sliderFloatView && sliderFloatView->hasParameter()) link(sliderFloatView->getParameter());
-      if (sliderIntView && sliderIntView->hasParameter()) link(sliderIntView->getParameter());
-      if (checkboxView && checkboxView->hasParameter()) link(checkboxView->getParameter());
-      if (buttonView && buttonView->hasParameter()) link(buttonView->getParameter());
+      if (parameterView) {
+        if (isParameterLinkable(parameterView->getParameterReference())) {
+          parameterView->setLinkStatus(true);
+          link(parameterView->getParameterReference());
+        }
+        else {
+          ofLogNotice("⚠️ ParameterLinker") << "Parameter '" << parameterView->getParameterName() << "' has already been linked! Enable multi-link or pick another parameter.";
+        }
+      }
     }
   }
   
-  bool isParameterLinkable(const ofAbstractParameter & param)
+  bool isParameterLinkable(const std::shared_ptr<ofAbstractParameter> & paramRef)
   {
-    return param.valueType() == typeid(float).name() || param.valueType() == typeid(int).name() || param.valueType() == typeid(bool).name() || param.valueType() == typeid(void).name();
+    bool linkExists = ofxCortex::core::utils::Array::accumulate<bool>(links, [&](bool carry, const std::map<std::string, std::shared_ptr<ofAbstractParameter>>::value_type & link){
+      return carry || link.second == paramRef;
+    }, false);
+    
+    bool isLinkable = multilinkEnabled || !linkExists;
+    
+    return isLinkable && (paramRef->valueType() == typeid(float).name() || paramRef->valueType() == typeid(int).name() || paramRef->valueType() == typeid(bool).name() || paramRef->valueType() == typeid(void).name());
   }
   
   std::string getMessageHash(const ofxMidiMessage & msg)
@@ -190,6 +198,8 @@ protected:
   std::deque<std::shared_ptr<ofAbstractParameter>> queuedParameters;
   std::map<std::string, std::shared_ptr<ofAbstractParameter>> links;
   std::vector<ofxMidiIn> midis;
+  
+  bool multilinkEnabled { true };
 };
 
 }}}
