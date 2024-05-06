@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include "ofParameter.h"
 #include "ofLog.h"
 #include "ofMath.h"
@@ -9,6 +10,13 @@
 namespace ofxCortex { namespace io { namespace midi {
 
 class ParameterLinker : public ofxMidiListener {
+protected:
+  struct Link {
+//    std::string messageHash;
+    std::shared_ptr<ofAbstractParameter> parameterRef;
+    std::shared_ptr<ofxCortex::ui::ParameterView> view;
+  };
+  
 public:
   ParameterLinker() {
     ofAddListener(ofEvents().update, this, &ParameterLinker::update);
@@ -35,6 +43,7 @@ public:
   
   void link(const std::shared_ptr<ofAbstractParameter> & parameterRef)
   {
+    ofLogVerbose("ParameterLinker") << "Queue '" << parameterRef->getName() << "' for link.";
     queuedParameters.push_back(parameterRef);
   }
   
@@ -61,7 +70,12 @@ public:
       ofJson json;
       file >> json;
       
-      for (auto & [hash, parameterName] : json.items()) { links[hash] = ofxCortex::core::utils::Parameters::getParameter(parameterName, parameters).newReference(); }
+      for (auto & [hash, parameterName] : json.items()) 
+      {
+        std::shared_ptr<ofAbstractParameter> ref = ofxCortex::core::utils::Parameters::getParameter(parameterName, parameters).newReference();
+        links[hash] = ref;
+        updateViewLinkStatus(ref, ofxCortex::ui::ParameterView::LinkStatus::LINKED);
+      }
       
       ofLogNotice("ParameterLinker::loadLinks()") << "💾 Links loaded from '" << path << "'!";
       return true;
@@ -96,8 +110,16 @@ protected:
       
       if (!linkIsTaken)
       {
-        ofLogNotice("ParameterLinker") << "Link: " << messageHash << " <=> '" << queuedParameters.front()->getName() << "'" << std::endl;
+        ofLogVerbose("ParameterLinker") << "Link: " << messageHash << " => '" << ofxCortex::core::utils::Parameters::serializeName(*queuedParameters.front()) << "'" << std::endl;
+        
         links[messageHash] = queuedParameters.front();
+        updateViewLinkStatus(queuedParameters.front(), ofxCortex::ui::ParameterView::LinkStatus::LINKED);
+        queuedParameters.pop_front();
+      }
+      else
+      {
+        ofLogWarning("ParameterLinker") << "There already exists a link for " << messageHash << " ('" << links[messageHash]->getName() << "')";
+        updateViewLinkStatus(queuedParameters.front(), ofxCortex::ui::ParameterView::LinkStatus::NOT_LINKED);
         queuedParameters.pop_front();
       }
     }
@@ -108,10 +130,10 @@ protected:
       
       if (parameter->valueType() == typeid(float).name())
       {
-        std::shared_ptr<ofxCortex::UnitParameter<float>> unitP = static_pointer_cast<ofxCortex::UnitParameter<float>>(parameter);
+        std::shared_ptr<ofxCortex::UnitParameter<float>> unitP = std::dynamic_pointer_cast<ofxCortex::UnitParameter<float>>(parameter);
         ofParameter<float> & casted = (unitP) ? unitP->getParameter() : parameter->cast<float>();
         
-        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax(), true);
+        casted.set(ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax(), true));
       }
       
       if (parameter->valueType() == typeid(int).name())
@@ -139,11 +161,21 @@ protected:
       
       if (parameter->valueType() == typeid(void).name())
       {
-        std::shared_ptr<ofxCortex::UnitParameter<void>> unitP = static_pointer_cast<ofxCortex::UnitParameter<void>>(parameter);
-        ofParameter<void> & casted = (unitP) ? unitP->getParameter() : parameter->cast<void>();
+        ofParameter<void> & casted = parameter->cast<void>();
         
         if (msg.value > 0) casted.trigger();
       }
+    }
+  }
+  
+  void updateViewLinkStatus(const std::shared_ptr<ofAbstractParameter> & paramRef, const ofxCortex::ui::ParameterView::LinkStatus & status)
+  {
+    static std::set<std::shared_ptr<ofxCortex::ui::ParameterView>> parameterViews = ofxCortex::ui::View::getEveryOfType<ofxCortex::ui::ParameterView>();
+    
+    std::string parameterName = ofxCortex::core::utils::Parameters::serializeName(*paramRef);
+    for (auto & view : parameterViews)
+    {
+      if (parameterName == view->getSerializedParameterName()) { view->setLinkStatus(status); }
     }
   }
   
@@ -165,9 +197,10 @@ protected:
       auto parameterView = dynamic_pointer_cast<ofxCortex::ui::ParameterView>(focusedView);
       
       if (parameterView) {
-        if (isParameterLinkable(parameterView->getParameterReference())) {
-          parameterView->setLinkStatus(true);
-          link(parameterView->getParameterReference());
+        auto ref = parameterView->getParameterReference();
+        if (isParameterLinkable(ref)) {
+          updateViewLinkStatus(ref, ofxCortex::ui::ParameterView::LinkStatus::PENDING);
+          link(ref);
         }
         else {
           ofLogNotice("⚠️ ParameterLinker") << "Parameter '" << parameterView->getParameterName() << "' has already been linked! Enable multi-link or pick another parameter.";
@@ -197,7 +230,6 @@ protected:
   
   std::deque<std::shared_ptr<ofAbstractParameter>> queuedParameters;
   std::map<std::string, std::shared_ptr<ofAbstractParameter>> links;
-  std::vector<ofxMidiIn> midis;
   
   bool multilinkEnabled { true };
 };
