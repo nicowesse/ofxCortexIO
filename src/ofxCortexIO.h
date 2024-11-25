@@ -9,3 +9,4 @@
 #include "ofxCortexIO/hardware/Controllers.h"
 
 #include "ofxCortexIO/midi/ParameterLinker.h"
+#include "ofxCortexIO/midi/ClockListener.h"

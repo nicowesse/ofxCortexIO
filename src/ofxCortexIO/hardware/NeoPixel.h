@@ -30,7 +30,7 @@ public:
       
       ofPushStyle();
       {
-        ofSetColor(16);
+        ofSetColor(16, 64);
         ofFill();
         ofDrawBox(0, 1, 0, 7, 2, 7);
         
@@ -70,7 +70,7 @@ public:
     return std::make_shared<EnableMakeShared>(std::forward<T>(t)...);
   }
   
-  static std::shared_ptr<NeoPixelStrip> fromPolyline(const ofPolyline & line, unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW)
+  static std::shared_ptr<NeoPixelStrip> fromPolyline(const ofPolyline & line, unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, const glm::vec3 & normal = glm::vec3(0, 1, 0), size_t indexOffset = 0)
   {
     int ledCount = (line.getPerimeter() / 1000.0) * ledsPerMeter;
     ofPolyline spacedLine = line.getResampledByCount(ledCount * 2);
@@ -80,10 +80,10 @@ public:
     {
       const auto & v = spacedLine[i];
       auto led = ofxCortex::io::hardware::NeoPixel::create(ofFloatColor(0, 0), i, type);
-      led->index = i;
+      led->index = i + indexOffset;
       led->setParent(*instance);
       led->setPosition(v);
-  //    led->setOrientation(glm::vec3(90, 0, 0));
+      led->lookAt(led->getPosition() + normal);
       
       instance->leds.push_back(led);
     }
@@ -91,13 +91,12 @@ public:
     return instance;
   }
   
-  static std::shared_ptr<NeoPixelStrip> fromDirection(const glm::vec3 & direction, size_t count, const glm::vec3 & normal = glm::vec3(0, 1, 0), unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW)
+  static std::shared_ptr<NeoPixelStrip> fromDirection(const glm::vec3 & direction, size_t count, const glm::vec3 & normal = glm::vec3(0, 1, 0), unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, size_t indexOffset = 0)
   {
     auto instance = NeoPixelStrip::create(ledsPerMeter, type);
     for (int i = 0; i < count; i++)
     {
-      auto led = ofxCortex::io::hardware::NeoPixel::create(ofFloatColor(0, 0), i, type);
-      led->index = i;
+      auto led = ofxCortex::io::hardware::NeoPixel::create(ofFloatColor(0, 0), i + indexOffset, type);
       led->setParent(*instance);
       led->setPosition(direction * instance->getSpacing() * i);
       led->lookAt(led->getPosition() + normal);
