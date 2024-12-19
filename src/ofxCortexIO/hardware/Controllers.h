@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofxCortex/utils/Helpers.h"
+#include "ofxCortex/types/Status.h"
 #include "ofxCortexIO/utils/Artnet.h"
 #include "ofxCortexIO/hardware/Devices.h"
 
@@ -22,7 +23,11 @@ public:
     return std::make_shared<EnableMakeShared>(std::forward<T>(t)...);
   }
   
-  inline void connect(const std::string & IP) { address.setWithoutEventNotifications(IP); isConnected = artnet.setup(IP); }
+  inline void connect(const std::string & IP) {
+    address.setWithoutEventNotifications(IP);
+    isConnected = artnet.setup(IP);
+    status = isConnected ? ofxCortex::types::Status::SENDING : ofxCortex::types::Status::DISCONNECTED;
+  }
   
   inline void addDeviceToOutput(const std::shared_ptr<ArtnetDevice> & device, unsigned int port) { outputs[port].push_back(device); }
   
@@ -34,6 +39,7 @@ public:
   void drawStructure(const ofRectangle & bounds = ofGetCurrentViewport());
   
   void send();
+  void send(const std::vector<ofxArtnetMessage> & packets);
   void clear();
   
   operator ofParameterGroup&() { return parameters; }
@@ -41,7 +47,7 @@ public:
 protected:
   ArtnetController(size_t outputCount) {
     parameters.setName("Artnet Controller");
-    parameters.add(address);
+    parameters.add(status, address);
     address.addListener(this, &ArtnetController::onAddressChanged);
     
     for (int i = 0; i < outputCount; i++)
@@ -49,7 +55,8 @@ protected:
       outputs.insert({ i, std::vector<std::shared_ptr<ArtnetDevice>>() });
     }
     
-    artnet.disableThread();
+//    artnet.disableThread();
+    artnet.enableThread(1000);
   }
   
   ofxArtnetSender artnet;
@@ -59,6 +66,7 @@ protected:
   
   // Parameters
   ofParameterGroup parameters;
+  ofParameter<ofxCortex::types::Status> status { "Status", ofxCortex::types::Status::CONNECTING };
   ofParameter<std::string> address { "IP", "0.0.0.0" };
   void onAddressChanged(std::string & address) { this->connect(address); }
 };

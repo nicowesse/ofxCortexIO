@@ -50,8 +50,8 @@ public:
   virtual std::vector<uint8_t> getData() override
   {
     const ofColor & c = getRGBW();
-    if (dataType == DataType::RGB) return std::vector<uint8_t>({ c.g, c.r, c.b });
-    else return std::vector<uint8_t>({ c.g, c.r, c.b, c.a });
+    if (dataType == DataType::RGB) return std::vector<uint8_t>({ c.r, c.g, c.b });
+    else return std::vector<uint8_t>({ c.r, c.g, c.b, c.a });
   }
   
   virtual unsigned int getChannelCount() override { return (int) dataType; }
@@ -73,7 +73,7 @@ public:
   static std::shared_ptr<NeoPixelStrip> fromPolyline(const ofPolyline & line, unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, const glm::vec3 & normal = glm::vec3(0, 1, 0), size_t indexOffset = 0)
   {
     int ledCount = (line.getPerimeter() / 1000.0) * ledsPerMeter;
-    ofPolyline spacedLine = line.getResampledByCount(ledCount * 2);
+    ofPolyline spacedLine = line.getResampledByCount(ledsPerMeter * 2);
     
     auto instance = NeoPixelStrip::create(ledsPerMeter, type);
     for (int i = 1; i < spacedLine.size(); i += 2)

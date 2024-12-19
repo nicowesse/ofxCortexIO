@@ -5,6 +5,7 @@
 #include "ofMath.h"
 #include "ofxMidi.h"
 #include "ofxCortex/utils/ParameterUtils.h"
+#include "ofxCortex/utils/ContainerUtils.h"
 #include "ofxCortex/utils/TimingUtils.h"
 #include "ofxCortexUI.h"
 
@@ -16,67 +17,20 @@ public:
     ofAddListener(ofEvents().update, this, &ParameterLinker::update);
     ofAddListener(ofEvents().keyPressed, this, &ParameterLinker::keyPressed);
     
-    auto devices = midiIn.getInPortList();
-    auto deviceDropdownItems = ofxCortex::core::types::Select<int>();
-    for (int i = 0; i < devices.size(); i++) { deviceDropdownItems.add(i, devices[i]); }
-    
     parameters.setName("Parameter Linker");
-    parameters.add(deviceDropdown.set("Device", deviceDropdownItems));
-    
-    onDeviceChanged = deviceDropdown.newListener([this](ofxCortex::core::types::Select<int> & param) {
-      this->setup(param.selected());
-    });
-    
-    auto timer = core::Timing::setInterval([&, this](){
-      auto devices = midiIn.getInPortList();
-      
-      if (devices.size() != deviceDropdown->size())
-      {
-        auto deviceDropdownItems = ofxCortex::core::types::Select<int>();
-        for (int i = 0; i < devices.size(); i++) { deviceDropdownItems.add(i, devices[i]); }
-        deviceDropdown.set(deviceDropdownItems);
-      }
-      
-    }, 10000);
+    parameters.add(devices);
   };
   
   ~ParameterLinker() {
     ofRemoveListener(ofEvents().update, this, &ParameterLinker::update);
     ofRemoveListener(ofEvents().keyPressed, this, &ParameterLinker::keyPressed);
     
-    midiIn.closePort();
+    for (auto & [name, input] : midiInputs) input->closePort();
+    
+    timer->stop();
   }
   
   inline static std::shared_ptr<ParameterLinker> create() { return std::make_shared<ParameterLinker>(); }
-  
-  void setup(int port)
-  {
-    ofLogNotice("ParameterLinker::setup(" + ofToString(port) + ")");
-    
-    if (midiIn.getNumInPorts() == 0) return;
-    
-    midiIn.closePort();
-    midiIn.openPort(port);
-    midiIn.ignoreTypes(true, true, true);
-//    midiIn.setVerbose(true);
-    
-    auto ref = deviceDropdown.get();
-    ref.setSelectedIndex(port);
-    deviceDropdown.setWithoutEventNotifications(ref);
-  }
-  
-  void setup(const std::string & portName)
-  {
-    if (midiIn.getNumInPorts() == 0) return;
-    
-    auto devices = midiIn.getInPortList();
-    size_t index = ofFind(devices, portName);
-    size_t found = index != devices.size();
-    
-    if (!found) return;
-    
-    this->setup(index);
-  }
   
   void queueLink(const ofAbstractParameter & parameter)
   {
@@ -89,7 +43,7 @@ public:
     queuedParameters.push_back(parameter.newReference());
   }
   
-  bool saveLinks(string path = "links.json")
+  bool saveLinks(const std::string & path = "links.json")
   {
     ofJson json;
     
@@ -146,19 +100,13 @@ public:
     bool shouldUnlink = e.key == 'u' && e.hasModifier(OF_KEY_COMMAND);
     auto focused = ofxCortex::ui::focusedParameter;
     
-    if (shouldLink && focused) {
-      queueLink(*focused.get());
-    }
-    if (shouldUnlink && focused) {
-      unlink(focused);
-    }
+    if (shouldLink && focused) { queueLink(*focused.get()); }
+    if (shouldUnlink && focused) { unlink(focused); }
   }
   
   operator ofParameterGroup&() { return parameters; }
   
 protected:
-  ofxMidiIn midiIn;
-  
 //  virtual void newMidiMessage(ofxMidiMessage& msg) override {} // Just a placeholder for now
   
   bool link(const std::string & hash, std::shared_ptr<ofAbstractParameter> parameter)
@@ -167,7 +115,7 @@ protected:
     
     if (!linkIsTaken)
     {
-      ofLogVerbose("🔗 ParameterLinker") << "Link: " << hash << " <=> '" << parameter->getName() << "'";
+      ofLogVerbose("🔗 ParameterLinker") << "Link: " << hash << " <=> '" << ofxCortex::core::utils::Parameters::serializeName(*parameter) << "'";
       
       links[hash] = parameter;
       ofxCortex::ui::linkedParameters.insert(ofxCortex::core::utils::Parameters::hash(*parameter));
@@ -176,21 +124,51 @@ protected:
     }
     else
     {
-      ofLogWarning("⚠️ ParameterLinker") << "Link for '" << hash << "' is already taken! Cmd+U to unlink.";
+      ofLogWarning("⚠️ ParameterLinker") << "Link for '" << hash << "' is already linked to '" << links[hash]->getName() << "'! Cmd+U to unlink.";
     }
     
     return false;
   }
   
+  uint64_t lastPollingTime { 0 };
+  const uint64_t pollingInterval { 2000 };
   void update(ofEventArgs & e)
   {
-    if (midiIn.hasWaitingMessages())
+    for (auto & [name, input] : midiInputs)
     {
-      ofxMidiMessage message;
-      while (midiIn.getNextMessage(message))
+      if (input->hasWaitingMessages())
       {
-        processMessage(message);
+        ofxMidiMessage message;
+        while (input->getNextMessage(message))
+        {
+          processMessage(message);
+        }
       }
+    }
+    
+    static std::vector<std::string> ignoreDevices = {
+      "IAC Driver Bus 1"
+    };
+
+    auto currentTime = ofGetElapsedTimeMillis();
+    if (currentTime - lastPollingTime > pollingInterval)
+    {
+      for (auto & deviceName : ofxMidiIn::getMidiDevices())
+      {
+        if (ofContains(ignoreDevices, deviceName)) continue;
+        
+        auto input = std::make_shared<ofxMidiIn>();
+        input->openPort(deviceName);
+        input->ignoreTypes(true, true, true);
+        
+        midiInputs.insert({ deviceName, input });
+        ignoreDevices.push_back(deviceName);
+        
+        ofParameter<ofxCortex::types::Status> device { deviceName, ofxCortex::types::Status::CONNECTED };
+        devices.add(device);
+      }
+      
+      lastPollingTime = currentTime;
     }
   }
   
@@ -198,27 +176,29 @@ protected:
   {
     std::string messageHash = getMessageHash(msg);
     
-    if (queuedParameters.size() && queuedParameters.front() != nullptr && link(messageHash, queuedParameters.front()))
-    {
-        queuedParameters.pop_front();
-    }
+    auto deviceParameter = devices[msg.portName].cast<ofxCortex::types::Status>();
+    auto ref = deviceParameter.get();
+    ref = ofxCortex::types::Status::RECEIVING;
+    deviceParameter.set(ref);
+    
+    if (queuedParameters.size() && queuedParameters.front() != nullptr && link(messageHash, queuedParameters.front())) { queuedParameters.pop_front(); }
     
     if (links.count(messageHash))
     {
       const auto & parameter = links[messageHash];
       
+      ofLogNotice("ParameterLinker::processMessage()") << "[" << messageHash << "] Value = " << msg.value << " => '" << ofxCortex::core::utils::Parameters::serializeName(*parameter) << "'";
+      
       if (parameter->valueType() == typeid(float).name())
       {
         ofParameter<float> & casted = parameter->cast<float>();
-        
-        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax());
+        casted = ofMap(msg.value, 0, 127, casted.getMin(), casted.getMax());
       }
       
       if (parameter->valueType() == typeid(int).name())
       {
         ofParameter<int> & casted = parameter->cast<int>();
-        
-        casted = ofMap(msg.value, 0, 126, casted.getMin(), casted.getMax());
+        casted = ofMap(msg.value, 0, 127, casted.getMin(), casted.getMax());
       }
       
       if (parameter->valueType() == typeid(bool).name())
@@ -238,16 +218,40 @@ protected:
       if (parameter->valueType() == typeid(void).name())
       {
         ofParameter<void> & casted = parameter->cast<void>();
-        
         if (msg.value > 0) casted.trigger();
+      }
+      
+      if (parameter->valueType() == typeid(ofFloatColor).name())
+      {
+        auto & casted = parameter->cast<ofFloatColor>();
+        auto ref = casted.get();
+        ref.setHue(ofMap(msg.value, 0, 127, 0.0, 1.0));
+        casted.set(ref);
       }
       
       if (parameter->valueType() == typeid(ofxCortex::core::types::Select<int>).name())
       {
-        ofParameter<ofxCortex::core::types::Select<int>> & casted = parameter->cast<ofxCortex::core::types::Select<int>>();
+        auto & casted = parameter->cast<ofxCortex::core::types::Select<int>>();
         
         auto ref = casted.get();
         ref.setSelectedIndex((int)ofMap(msg.value, 0, 126, 0, ref.size(), true));
+        
+        casted.set(ref);
+      }
+      
+      if (parameter->valueType() == typeid(ofxCortex::core::types::BeatDivision).name())
+      {
+        auto & casted = parameter->cast<ofxCortex::core::types::BeatDivision>();
+        
+        bool isSlider = msg.value > 0 && msg.value < 127;
+        
+        auto ref = casted.get();
+        
+        if (msg.value == 127 && !isSlider) ref++; // Toggle
+        else if (isSlider)
+        {
+          ref.setSelectedIndex((int) ofMap(msg.value, 1, 126, 0, ref.size(), true));
+        }
         
         casted.set(ref);
       }
@@ -269,14 +273,13 @@ protected:
   
   bool unlink(std::shared_ptr<ofAbstractParameter> & param)
   {
-    
     std::string removeKey = "";
     bool found = false;
     
     auto hashed = ofxCortex::core::utils::Parameters::hash(*param);
-    for (auto & [key, value] : links)
+    for (auto & [key, parameter] : links)
     {
-      if (ofxCortex::core::utils::Parameters::hash(*value) == hashed)
+      if (ofxCortex::core::utils::Parameters::hash(*parameter) == hashed)
       {
         removeKey = key;
         found = true;
@@ -293,10 +296,14 @@ protected:
   
   std::deque<std::shared_ptr<ofAbstractParameter>> queuedParameters;
   std::map<std::string, std::shared_ptr<ofAbstractParameter>> links;
-  std::vector<ofxMidiIn> midis;
+  
+//  ofxMidiIn midiIn;
+  std::shared_ptr<ofxCortex::core::Timer<void>> timer;
+  std::unordered_map<std::string, std::shared_ptr<ofxMidiIn>> midiInputs;
   
   ofParameterGroup parameters;
-  ofParameter<ofxCortex::core::types::Select<int>> deviceDropdown;
+//  ofParameter<std::vector<std::string>> devices { "Devices", std::vector<std::string>() };
+  ofParameterGroup devices { "Devices" };
   ofEventListener onDeviceChanged;
 };
 

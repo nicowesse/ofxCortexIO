@@ -6,24 +6,23 @@ void ArtnetController::send()
 {
   unsigned long latency = ofGetElapsedTimeMillis() - lastTransmit;
   
-//  unsigned output = 3;
-//  unsigned channels = 4;
-//  uint8_t outputAndChannels = (output << 4) | channels;
-  
   std::vector<ofxArtnetMessage> packets;
   for (int i = 0; i < outputs.size(); i++)
   {
     const auto & devices = outputs.at(i);
     if (devices.size() == 0) continue;
     
-    auto outputPackets = ofxCortex::io::utils::devicesToArtnet(devices, i * 4);
+    auto outputPackets = ofxCortex::io::utils::devicesToArtnet(devices, i * 2);
     for (auto & packet : outputPackets) {
-//      uint channelsAndOutput = ((unsigned) i << 4) | packet.getSubnet();
-      packet.setUniverse(i, packet.getSubnet(), packet.getUniverse()); // Net = Output Port | Subnet = Channels pr device
+//      ofLogNotice("ArtnetController::send()") << "\n\tOutput = " << i << "\n\tIndex Offset = " << packet.getSubnet() << "\n\tUniverse = " << packet.getUniverse() << "\n\tSize = " << packet.getSize();
+      packet.setUniverse15(packet.getUniverse());
+//      packet.setUniverse(i, packet.getSubnet(), packet.getUniverse()); // Net = Output Port | Subnet = LED Index Offset
     }
     ofxCortex::core::utils::Array::appendVector(packets, outputPackets);
   }
-  ofxCortex::io::utils::sendPackets(artnet, packets);
+//  ofxCortex::io::utils::sendPackets(artnet, packets);
+  
+  for (const auto & packet : packets) artnet.sendArtnet(packet);
   
   if (ofGetLogLevel() == OF_LOG_VERBOSE)
   {
@@ -36,6 +35,11 @@ void ArtnetController::send()
   }
   
   lastTransmit = ofGetElapsedTimeMillis();
+}
+
+void ArtnetController::send(const std::vector<ofxArtnetMessage> & packets)
+{
+  ofxCortex::io::utils::sendPackets(artnet, packets);
 }
 
 void ArtnetController::clear()

@@ -14,7 +14,7 @@ namespace ofxCortex { namespace io { namespace utils {
 
 struct DeviceData {
   uint16_t universe;
-  uint8_t channelStride;
+  uint8_t indexOffset;
   std::vector<uint8_t> data;
 };
 
@@ -60,6 +60,7 @@ inline static std::vector<ofxArtnetMessage> devicesToArtnet(const std::vector<st
   uint16_t currentUniverse = universeOffset;
   
   std::map<uint16_t, DeviceData> universeData;
+  unsigned int indexOffset = 0;
   for (int i = 0; i < devices.size(); i++)
   {
     const auto & device = devices[i];
@@ -67,18 +68,24 @@ inline static std::vector<ofxArtnetMessage> devicesToArtnet(const std::vector<st
     
     DeviceData deviceData;
     deviceData.universe = currentUniverse;
-    deviceData.channelStride = device->getChannelCount();
+    deviceData.indexOffset = indexOffset;
+    
+//    ofLogNotice("ArtnetUtils::devicesToArtnet()") << "Device Index = " << i << " | Universe = " << currentUniverse << " | Universe Offset = " << universeOffset << " | Index Offset = " << indexOffset << " | Data Size = " << data.size() << " (" << data.size() / device->getChannelCount() << " units)";
 
     for (int ch = 0; ch < data.size(); ch++)
     {
-      if (currentDataIndex >= 512) {
+      if (currentDataIndex >= 512 - 1) {
         universeData[currentUniverse] = deviceData; // Push current data
         
         currentUniverse++; // Increment to next universe
         currentDataIndex = 0; // Reset current data entry index
+        indexOffset += 512 / device->getChannelCount();
         
         deviceData.universe = currentUniverse;
+        deviceData.indexOffset = indexOffset;
         deviceData.data.clear();
+        
+//        ofLogNotice("ArtnetUtils::devicesToArtnet()") << "Universe packed (" << bytes << " bytes)! Skipping to next universe (" << currentUniverse << ")";
       }
       
       deviceData.data.push_back(data[ch]);
@@ -87,6 +94,10 @@ inline static std::vector<ofxArtnetMessage> devicesToArtnet(const std::vector<st
       bytes++;
     }
     
+    currentUniverse++;
+    currentDataIndex = 0;
+    indexOffset += data.size() / device->getChannelCount();
+    
     universeData[currentUniverse] = deviceData;
   }
 
@@ -94,7 +105,7 @@ inline static std::vector<ofxArtnetMessage> devicesToArtnet(const std::vector<st
   for (auto [universe, deviceData] : universeData)
   {
     ofxArtnetMessage msg;
-    msg.setUniverse(0, deviceData.channelStride, deviceData.universe);
+    msg.setUniverse(0, deviceData.indexOffset, deviceData.universe);
     msg.setData(deviceData.data);
     messages.push_back(msg);
   }
