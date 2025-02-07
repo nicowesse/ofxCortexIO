@@ -6,7 +6,7 @@
 #include "ofGraphics.h"
 #include "of3dGraphics.h"
 
-namespace ofxCortex { namespace io { namespace hardware {
+namespace ofxCortex::io::hardware {
 
 
 //template<typename T>
@@ -88,4 +88,4 @@ protected:
   LED(const ofFloatColor & color = ofFloatColor(0, 0), unsigned int index = 0) : color(color), index(index) {};
 };
 
-}}}
+}

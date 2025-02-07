@@ -20,10 +20,8 @@ public:
     
     auto devices = midiIn.getInPortList();
     ofxCortex::core::types::Select<int> currentDevices;
-    for (int i = 0; i < devices.size(); i++)
-    {
-      currentDevices.add(i, devices[i]);
-    }
+    for (int i = 0; i < devices.size(); i++) { currentDevices.add(i, devices[i]); }
+    if (devices.empty()) currentDevices.add(-1, "No Devices Found");
     devicesDropdown.setName("Device");
     devicesDropdown = currentDevices;
     onDeviceChange = devicesDropdown.newListener([this](ofxCortex::core::types::Select<int> & param){
@@ -47,6 +45,8 @@ public:
   
   void setup(const std::string & portName)
   {
+    if (portName == "") return;
+    
     midiIn.closePort();
     
     if (midiIn.openPort(portName)) status = ofxCortex::types::Status::CONNECTED;
@@ -117,7 +117,7 @@ private:
       status = ofxCortex::types::Status::RECEIVING;
     }
     
-    if (msg.status == MIDI_STOP)
+    if (msg.status == MIDI_START || msg.status == MIDI_STOP)
     {
       status = ofxCortex::types::Status::CONNECTED;
       beatCounter = 0;

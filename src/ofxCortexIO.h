@@ -10,3 +10,5 @@
 
 #include "ofxCortexIO/midi/ParameterLinker.h"
 #include "ofxCortexIO/midi/ClockListener.h"
+
+#include "ofxCortexIO/audio/Analyzer.h"

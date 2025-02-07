@@ -5,7 +5,7 @@
 #include "ofxCortexIO/utils/Artnet.h"
 #include "ofxCortexIO/hardware/Devices.h"
 
-namespace ofxCortex { namespace io { namespace hardware {
+namespace ofxCortex::io::hardware {
 
 class ArtnetController {
 public:
@@ -71,4 +71,4 @@ protected:
   void onAddressChanged(std::string & address) { this->connect(address); }
 };
 
-}}}
+}

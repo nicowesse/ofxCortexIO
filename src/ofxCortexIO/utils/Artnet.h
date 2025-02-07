@@ -10,7 +10,7 @@
 #include "ofxCortexIO/hardware/Devices.h"
 
 
-namespace ofxCortex { namespace io { namespace utils {
+namespace ofxCortex::io::utils {
 
 struct DeviceData {
   uint16_t universe;
@@ -119,4 +119,4 @@ inline static void sendColorsOverArtnet(ofxArtnetSender & artnet, const std::vec
   sendPackets(artnet, colorsToArtnet(colors, format, universeOffset));
 }
 
-}}}
+}

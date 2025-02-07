@@ -9,7 +9,7 @@
 #include "ofxCortex/utils/TimingUtils.h"
 #include "ofxCortexUI.h"
 
-namespace ofxCortex { namespace io { namespace midi {
+namespace ofxCortex::io::midi {
 
 class ParameterLinker {
 public:
@@ -26,8 +26,6 @@ public:
     ofRemoveListener(ofEvents().keyPressed, this, &ParameterLinker::keyPressed);
     
     for (auto & [name, input] : midiInputs) input->closePort();
-    
-    timer->stop();
   }
   
   inline static std::shared_ptr<ParameterLinker> create() { return std::make_shared<ParameterLinker>(); }
@@ -298,7 +296,6 @@ protected:
   std::map<std::string, std::shared_ptr<ofAbstractParameter>> links;
   
 //  ofxMidiIn midiIn;
-  std::shared_ptr<ofxCortex::core::Timer<void>> timer;
   std::unordered_map<std::string, std::shared_ptr<ofxMidiIn>> midiInputs;
   
   ofParameterGroup parameters;
@@ -307,4 +304,4 @@ protected:
   ofEventListener onDeviceChanged;
 };
 
-}}}
+}

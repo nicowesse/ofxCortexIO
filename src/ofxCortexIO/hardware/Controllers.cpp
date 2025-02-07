@@ -1,6 +1,6 @@
 #include "Controllers.h"
 
-namespace ofxCortex { namespace io { namespace hardware {
+namespace ofxCortex::io::hardware {
 
 void ArtnetController::send()
 {
@@ -138,4 +138,4 @@ void ArtnetController::drawStructure(const ofRectangle & bounds)
   ofPopStyle();
 }
 
-}}}
+}

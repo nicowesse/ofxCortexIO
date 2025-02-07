@@ -1,6 +1,6 @@
 #include "NeoPixel.h"
 
-namespace ofxCortex { namespace io { namespace hardware {
+namespace ofxCortex::io::hardware {
 
 //void NeoPixel::draw() override
 //{
@@ -80,4 +80,4 @@ namespace ofxCortex { namespace io { namespace hardware {
 //  else for (auto & led : leds) Tweenzor::add(&led->color, led->color, c, 0.0f, animationTime, EASE_IN_OUT_QUINT);
 //}
 
-}}}
+}

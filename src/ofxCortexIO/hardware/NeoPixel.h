@@ -5,7 +5,7 @@
 #include "ofxCortex/utils/ContainerUtils.h"
 #include "Devices.h"
 
-namespace ofxCortex { namespace io { namespace hardware {
+namespace ofxCortex::io::hardware {
 
 struct NeoPixel : public LED {
 public:
@@ -147,4 +147,4 @@ protected:
   std::vector<std::shared_ptr<NeoPixel>> leds;
 };
 
-}}}
+}
