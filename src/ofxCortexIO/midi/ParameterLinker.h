@@ -162,15 +162,15 @@ protected:
     
     if (shouldLink) {
       auto focusedView = ofxCortex::ui::View::getFocused();
-//      auto sliderFloatView = dynamic_pointer_cast<ofxCortex::ui::Slider<float>>(focusedView);
-//      auto sliderIntView = dynamic_pointer_cast<ofxCortex::ui::Slider<int>>(focusedView);
-//      auto checkboxView = dynamic_pointer_cast<ofxCortex::ui::Checkbox>(focusedView);
-//      auto buttonView = dynamic_pointer_cast<ofxCortex::ui::Button>(focusedView);
-//      
-//      if (sliderFloatView && sliderFloatView->hasParameter()) link(sliderFloatView->getParameter());
-//      if (sliderIntView && sliderIntView->hasParameter()) link(sliderIntView->getParameter());
-//      if (checkboxView && checkboxView->hasParameter()) link(checkboxView->getParameter());
-//      if (buttonView && buttonView->hasParameter()) link(buttonView->getParameter());
+      auto sliderFloatView = dynamic_pointer_cast<ofxCortex::ui::Slider<float>>(focusedView);
+      auto sliderIntView = dynamic_pointer_cast<ofxCortex::ui::Slider<int>>(focusedView);
+      auto checkboxView = dynamic_pointer_cast<ofxCortex::ui::Checkbox>(focusedView);
+      auto buttonView = dynamic_pointer_cast<ofxCortex::ui::Button>(focusedView);
+      
+      if (sliderFloatView && sliderFloatView->hasParameter()) link(sliderFloatView->getParameter());
+      if (sliderIntView && sliderIntView->hasParameter()) link(sliderIntView->getParameter());
+      if (checkboxView && checkboxView->hasParameter()) link(checkboxView->getParameter());
+      if (buttonView && buttonView->hasParameter()) link(buttonView->getParameter());
     }
   }
   
