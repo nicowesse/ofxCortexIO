@@ -185,7 +185,7 @@ protected:
     {
       const auto & parameter = links[messageHash];
       
-      ofLogNotice("ParameterLinker::processMessage()") << "[" << messageHash << "] Value = " << msg.value << " => '" << ofxCortex::core::utils::Parameters::serializeName(*parameter) << "'";
+      ofLogVerbose("ParameterLinker::processMessage()") << "[" << messageHash << "] Value = " << msg.value << " => '" << ofxCortex::core::utils::Parameters::serializeName(*parameter) << "'";
       
       if (parameter->valueType() == typeid(float).name())
       {

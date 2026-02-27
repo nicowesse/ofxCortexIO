@@ -17,7 +17,12 @@ AudioAnalyzer::AudioAnalyzer()
 void AudioAnalyzer::setup(int deviceID)
 {
   ofLogVerbose("AudioAnalyzer::setup(" + ofToString(deviceID) + ")");
-  auto device = soundStream.getDeviceList()[deviceID];
+  
+  auto devices = soundStream.getDeviceList();
+  auto it = find_if(devices.begin(), devices.end(), [&deviceID](const ofSoundDevice& device) { return device.deviceID == deviceID; });
+  
+  if (it == devices.end()) return;
+  auto device = *it; //soundStream.getDeviceList()[deviceID];
   
   ofSoundStreamSettings settings;
   settings.setInListener(this);

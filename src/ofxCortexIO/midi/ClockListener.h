@@ -4,7 +4,7 @@
 #include "ofUtils.h"
 #include "ofxCortex/utils/AudioUtils.h"
 #include "ofxCortex/types/Status.h"
-#include "ofxCortex/types/OutputValue.h"
+#include "ofxCortex/types/DisplayValue.h"
 
 namespace ofxCortex::io::midi {
 
@@ -68,7 +68,7 @@ private:
   float actualBPM { 120 };
   
   ofParameterGroup parameters;
-  ofParameter<ofxCortex::types::OutputValue> BPM { "BPM", ofxCortex::types::OutputValue(120, "BPM") };
+    ofParameter<ofxCortex::types::DisplayValue> BPM { "BPM", ofxCortex::types::DisplayValue([this]() -> std::string { return ofToString(this->getBPM()); }, "BPM") };
   ofParameter<ofxCortex::types::Status> status { "Status", ofxCortex::types::Status::CONNECTING };
   ofParameter<ofxCortex::core::types::Select<int>> devicesDropdown;
   ofEventListener onDeviceChange;
@@ -105,11 +105,6 @@ private:
         float averageInterval = ofxCortex::core::utils::Array::average(intervals) * 0.001;
         
         float intervalToBPM = actualBPM = 60.0 / (averageInterval * Divisions::BEAT);
-        
-        auto updatedBPM = BPM.get();
-        updatedBPM = round(actualBPM);
-        
-        BPM = updatedBPM;
         
         intervals.clear();
       }

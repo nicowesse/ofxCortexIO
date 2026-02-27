@@ -105,7 +105,7 @@ inline static std::vector<ofxArtnetMessage> devicesToArtnet(const std::vector<st
   for (auto [universe, deviceData] : universeData)
   {
     ofxArtnetMessage msg;
-    msg.setUniverse(0, deviceData.indexOffset, deviceData.universe);
+    msg.setUniverse(0, deviceData.indexOffset, deviceData.universe + 1);
     msg.setData(deviceData.data);
     messages.push_back(msg);
   }

@@ -48,6 +48,7 @@ protected:
   ArtnetController(size_t outputCount) {
     parameters.setName("Artnet Controller");
     parameters.add(status, address);
+    address.setSerializable(false);
     address.addListener(this, &ArtnetController::onAddressChanged);
     
     for (int i = 0; i < outputCount; i++)

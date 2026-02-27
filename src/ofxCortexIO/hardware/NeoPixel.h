@@ -70,13 +70,13 @@ public:
     return std::make_shared<EnableMakeShared>(std::forward<T>(t)...);
   }
   
-  static std::shared_ptr<NeoPixelStrip> fromPolyline(const ofPolyline & line, unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, const glm::vec3 & normal = glm::vec3(0, 1, 0), size_t indexOffset = 0)
+  static std::shared_ptr<NeoPixelStrip> fromPolyline(const ofPolyline & line, unsigned int ledCount = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, const glm::vec3 & normal = glm::vec3(0, 1, 0), size_t indexOffset = 0)
   {
-    int ledCount = (line.getPerimeter() / 1000.0) * ledsPerMeter;
-    ofPolyline spacedLine = line.getResampledByCount(ledsPerMeter * 2);
+    ofPolyline spacedLine = line.getResampledByCount(ledCount - 1);
+    ofLogNotice("NeoPixelStrip::fromPolyline()") << "Spaced Line Size: " << spacedLine.size();
     
-    auto instance = NeoPixelStrip::create(ledsPerMeter, type);
-    for (int i = 1; i < spacedLine.size(); i += 2)
+    auto instance = NeoPixelStrip::create(type);
+    for (int i = 0; i < spacedLine.size(); i += 1)
     {
       const auto & v = spacedLine[i];
       auto led = ofxCortex::io::hardware::NeoPixel::create(ofFloatColor(0, 0), i, type);
@@ -93,12 +93,13 @@ public:
   
   static std::shared_ptr<NeoPixelStrip> fromDirection(const glm::vec3 & direction, size_t count, const glm::vec3 & normal = glm::vec3(0, 1, 0), unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW, size_t indexOffset = 0)
   {
-    auto instance = NeoPixelStrip::create(ledsPerMeter, type);
+    float spacing = 1000.0f / ledsPerMeter;
+    auto instance = NeoPixelStrip::create(type);
     for (int i = 0; i < count; i++)
     {
       auto led = ofxCortex::io::hardware::NeoPixel::create(ofFloatColor(0, 0), i + indexOffset, type);
       led->setParent(*instance);
-      led->setPosition(direction * instance->getSpacing() * i);
+      led->setPosition(direction * spacing * i);
       led->lookAt(led->getPosition() + normal);
       
       instance->leds.push_back(led);
@@ -138,11 +139,8 @@ public:
   }
   
 protected:
-  NeoPixelStrip(unsigned int ledsPerMeter = 144, NeoPixel::DataType type = NeoPixel::DataType::RGBW) : ledsPerMeter(ledsPerMeter), dataType(type) {};
+  NeoPixelStrip(NeoPixel::DataType type = NeoPixel::DataType::RGBW) : dataType(type) {};
   
-  inline float getSpacing() const { return 1000.0 / ledsPerMeter; }
-  
-  unsigned int ledsPerMeter;
   NeoPixel::DataType dataType;
   std::vector<std::shared_ptr<NeoPixel>> leds;
 };
